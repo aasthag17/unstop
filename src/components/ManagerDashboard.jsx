@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { getGoals, saveGoals, initialUsers } from '../data';
-import { CheckCircle, XCircle, Edit2, MessageSquare, ChevronDown, ChevronUp, User } from 'lucide-react';
+import { getGoals, saveGoals, initialUsers, computeScore } from '../data';
+import { CheckCircle, XCircle, Edit2, MessageSquare, ChevronDown, ChevronUp, User, Link } from 'lucide-react';
 
 export default function ManagerDashboard({ currentUser }) {
   const [teamGoals, setTeamGoals] = useState([]);
@@ -94,16 +94,22 @@ export default function ManagerDashboard({ currentUser }) {
                             <th>Weightage</th>
                             <th>Status</th>
                             <th>{activeQuarter} Actual</th>
+                            <th>Progress Score</th>
                             <th>Actions</th>
                           </tr>
                         </thead>
                         <tbody>
                           {memberGoals.map(goal => {
                             const checkin = goal.checkIns?.find(c => c.quarter === activeQuarter) || {};
+                            const score = computeScore(goal.uom, goal.target, checkin.actual);
+                            
                             return (
                               <tr key={goal.id}>
                                 <td>
-                                  <div style={{ fontWeight: 500 }}>{goal.title}</div>
+                                  <div style={{ fontWeight: 500, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    {goal.title}
+                                    {goal.isShared && <Link size={12} className="text-muted" />}
+                                  </div>
                                   <div className="text-muted" style={{ fontSize: '0.75rem' }}>{goal.thrustArea}</div>
                                 </td>
                                 <td>{goal.target} {goal.uom !== 'Numeric' ? goal.uom : ''}</td>
@@ -116,8 +122,15 @@ export default function ManagerDashboard({ currentUser }) {
                                 <td>
                                   {goal.status === 'Approved' ? (
                                     <div style={{ fontSize: '0.875rem' }}>
-                                      <div>{checkin.actual || '-'}</div>
+                                      <div style={{ fontWeight: 600 }}>{checkin.actual || '-'}</div>
                                       <div className="text-muted" style={{ fontSize: '0.75rem' }}>{checkin.status || 'Not Started'}</div>
+                                    </div>
+                                  ) : '-'}
+                                </td>
+                                <td>
+                                  {goal.status === 'Approved' && checkin.actual ? (
+                                    <div className="badge" style={{ display: 'inline-block', backgroundColor: score >= 100 ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)', color: score >= 100 ? 'var(--success)' : 'var(--warning)' }}>
+                                      {score}%
                                     </div>
                                   ) : '-'}
                                 </td>

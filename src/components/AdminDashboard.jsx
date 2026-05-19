@@ -1,9 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { getGoals, initialUsers } from '../data';
-import { Download, Users, Settings, Activity, FileText } from 'lucide-react';
+import { getGoals, initialUsers, saveGoals } from '../data';
+import { Download, Users, Settings, Activity, FileText, Share2, BarChart2 } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+
+const COLORS = ['#4F46E5', '#10B981', '#F59E0B', '#EF4444'];
 
 export default function AdminDashboard() {
   const [goals, setGoals] = useState([]);
+  const [showSharedModal, setShowSharedModal] = useState(false);
+  const [sharedGoalForm, setSharedGoalForm] = useState({ title: '', description: '', target: '', uom: 'Numeric', thrustArea: 'Business Growth' });
 
   useEffect(() => {
     setGoals(getGoals());
@@ -12,6 +17,15 @@ export default function AdminDashboard() {
   const totalEmployees = initialUsers.filter(u => u.role === 'Employee').length;
   const employeesWithGoals = new Set(goals.map(g => g.employeeId)).size;
   const completionRate = totalEmployees ? Math.round((employeesWithGoals / totalEmployees) * 100) : 0;
+
+  // Chart Data
+  const thrustAreaData = Object.entries(
+    goals.reduce((acc, g) => ({ ...acc, [g.thrustArea]: (acc[g.thrustArea] || 0) + 1 }), {})
+  ).map(([name, value]) => ({ name, value }));
+
+  const statusData = Object.entries(
+    goals.reduce((acc, g) => ({ ...acc, [g.status]: (acc[g.status] || 0) + 1 }), {})
+  ).map(([name, value]) => ({ name, value }));
 
   const downloadCSV = () => {
     const headers = ['Employee ID', 'Employee Name', 'Goal Title', 'Thrust Area', 'Weightage', 'Target', 'UoM', 'Status'];
@@ -39,16 +53,46 @@ export default function AdminDashboard() {
     document.body.removeChild(link);
   };
 
+  const pushSharedGoal = () => {
+    if (!sharedGoalForm.title || !sharedGoalForm.target) return;
+    
+    const employees = initialUsers.filter(u => u.role === 'Employee');
+    const newGoals = employees.map(emp => ({
+      id: Date.now() + Math.random(),
+      employeeId: emp.id,
+      title: sharedGoalForm.title,
+      description: sharedGoalForm.description,
+      thrustArea: sharedGoalForm.thrustArea,
+      uom: sharedGoalForm.uom,
+      target: sharedGoalForm.target,
+      weightage: 10, // Default adjustable weightage
+      status: 'Draft',
+      isShared: true, // Marker for shared goal
+      checkIns: []
+    }));
+
+    const updatedGoals = [...goals, ...newGoals];
+    saveGoals(updatedGoals);
+    setGoals(updatedGoals);
+    setShowSharedModal(false);
+    alert('Departmental goal pushed to all employees successfully!');
+  };
+
   return (
     <div className="animate-fade-in delay-100">
       <div className="flex-between mb-6">
         <div>
           <h2>Admin Control Center</h2>
-          <p className="text-muted text-sm mt-1">Platform governance and reporting</p>
+          <p className="text-muted text-sm mt-1">Governance, Analytics & Cycle Management</p>
         </div>
-        <button className="btn btn-primary" onClick={downloadCSV}>
-          <Download size={16} /> Export Report
-        </button>
+        <div className="flex-center" style={{ gap: '1rem' }}>
+          <button className="btn btn-secondary" onClick={() => setShowSharedModal(true)}>
+            <Share2 size={16} /> Push Shared Goal
+          </button>
+          <button className="btn btn-primary" onClick={downloadCSV}>
+            <Download size={16} /> Export Report
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-4 mb-6" style={{ gap: '1rem' }}>
@@ -85,6 +129,38 @@ export default function AdminDashboard() {
         </div>
       </div>
 
+      <div className="grid grid-cols-2 mb-6" style={{ gap: '1.5rem' }}>
+        <div className="glass-panel" style={{ padding: '1.5rem' }}>
+          <h3 className="mb-4" style={{ fontSize: '1.125rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <BarChart2 size={18} /> Goals by Thrust Area
+          </h3>
+          <div style={{ height: 250 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={thrustAreaData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                <XAxis dataKey="name" stroke="var(--text-muted)" tick={{ fill: 'var(--text-muted)', fontSize: 12 }} />
+                <YAxis stroke="var(--text-muted)" tick={{ fill: 'var(--text-muted)' }} />
+                <Tooltip contentStyle={{ backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '0.5rem' }} />
+                <Bar dataKey="value" fill="var(--primary-color)" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+        <div className="glass-panel" style={{ padding: '1.5rem' }}>
+          <h3 className="mb-4" style={{ fontSize: '1.125rem' }}>Goal Status Distribution</h3>
+          <div style={{ height: 250 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={statusData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                  {statusData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                </Pie>
+                <Tooltip contentStyle={{ backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '0.5rem' }} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
       <div className="glass-panel" style={{ padding: '1.5rem' }}>
         <h3 className="mb-4" style={{ fontSize: '1.25rem' }}>System Audit Trail</h3>
         <div className="table-container">
@@ -99,10 +175,10 @@ export default function AdminDashboard() {
             </thead>
             <tbody>
               <tr>
-                <td>2026-05-19 10:15 AM</td>
+                <td>{new Date().toLocaleString()}</td>
                 <td>David Chen (Admin)</td>
-                <td>Cycle Activated</td>
-                <td>Q1 2026 Check-in</td>
+                <td>Viewed Dashboard</td>
+                <td>System Analytics</td>
               </tr>
               <tr>
                 <td>2026-05-18 04:30 PM</td>
@@ -116,16 +192,54 @@ export default function AdminDashboard() {
                 <td>Goal Submitted</td>
                 <td>Alex Johnson (3 Goals)</td>
               </tr>
-              <tr>
-                <td>2026-05-15 02:20 PM</td>
-                <td>David Chen (Admin)</td>
-                <td>System Config</td>
-                <td>Max Goals Limit Set (8)</td>
-              </tr>
             </tbody>
           </table>
         </div>
       </div>
+
+      {showSharedModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}>
+          <div className="glass-panel animate-fade-in" style={{ width: '500px', padding: '2rem' }}>
+            <h3 className="mb-4">Push Departmental Goal</h3>
+            <p className="text-muted mb-4" style={{ fontSize: '0.875rem' }}>This will create a locked-content goal for all employees. They can only adjust the weightage.</p>
+            
+            <div className="form-group">
+              <label className="form-label">Goal Title</label>
+              <input className="form-input" value={sharedGoalForm.title} onChange={e => setSharedGoalForm({...sharedGoalForm, title: e.target.value})} placeholder="e.g. Complete Security Training" />
+            </div>
+            
+            <div className="form-group">
+              <label className="form-label">Target</label>
+              <input className="form-input" value={sharedGoalForm.target} onChange={e => setSharedGoalForm({...sharedGoalForm, target: e.target.value})} placeholder="e.g. 100 or 2026-08-01" />
+            </div>
+
+            <div className="grid grid-cols-2 mb-4">
+               <div className="form-group">
+                  <label className="form-label">UoM</label>
+                  <select className="form-select" value={sharedGoalForm.uom} onChange={e => setSharedGoalForm({...sharedGoalForm, uom: e.target.value})}>
+                    <option value="Numeric">Numeric</option>
+                    <option value="%">%</option>
+                    <option value="Timeline">Timeline</option>
+                    <option value="Zero">Zero</option>
+                  </select>
+               </div>
+               <div className="form-group">
+                  <label className="form-label">Thrust Area</label>
+                  <select className="form-select" value={sharedGoalForm.thrustArea} onChange={e => setSharedGoalForm({...sharedGoalForm, thrustArea: e.target.value})}>
+                    <option value="Business Growth">Business Growth</option>
+                    <option value="Operational Excellence">Operational Excellence</option>
+                    <option value="Compliance">Compliance</option>
+                  </select>
+               </div>
+            </div>
+
+            <div className="flex-between mt-6">
+              <button className="btn btn-secondary" onClick={() => setShowSharedModal(false)}>Cancel</button>
+              <button className="btn btn-primary" onClick={pushSharedGoal}>Push to All Employees</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

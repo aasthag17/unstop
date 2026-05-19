@@ -16,7 +16,7 @@ export const initialGoals = [
     weightage: 40,
     status: 'Approved',
     checkIns: [
-      { quarter: 'Q1', actual: 'Development 50% complete', status: 'On Track', comment: 'Good progress.', date: '2026-04-15' }
+      { quarter: 'Q1', actual: '2026-05-15', status: 'On Track', comment: 'Good progress.', date: '2026-04-15' }
     ]
   },
   {
@@ -57,3 +57,30 @@ export const initStorage = () => {
 
 export const getGoals = () => JSON.parse(localStorage.getItem('aq_goals') || '[]');
 export const saveGoals = (goals) => localStorage.setItem('aq_goals', JSON.stringify(goals));
+
+// System-computed progress score based on UoM (Phase 2 Requirement)
+export const computeScore = (uom, target, actual) => {
+  if (!actual) return 0;
+  
+  if (uom === 'Numeric' || uom === '%') {
+    const t = parseFloat(target) || 1;
+    const a = parseFloat(actual) || 0;
+    // Assume higher is better (Min metric type)
+    const score = (a / t) * 100;
+    return Math.min(Math.max(Math.round(score), 0), 100);
+  }
+  
+  if (uom === 'Zero') {
+    const a = parseFloat(actual);
+    return a === 0 ? 100 : 0;
+  }
+  
+  if (uom === 'Timeline') {
+    const targetDate = new Date(target).getTime();
+    const actualDate = new Date(actual).getTime();
+    if (isNaN(targetDate) || isNaN(actualDate)) return 0;
+    return actualDate <= targetDate ? 100 : 0;
+  }
+  
+  return 0;
+};
